@@ -32,8 +32,7 @@ router.post("/pickups/:id/status", async (req, res) => {
     ACCEPTED: ["EN_ROUTE"],
     EN_ROUTE: ["ARRIVED"],
     ARRIVED: ["WEIGHING"],
-    WEIGHING: ["PAYMENT_PENDING"],
-    PAYMENT_PENDING: ["COMPLETED"]
+    WEIGHING: ["PAYMENT_PENDING"]
   };
   const pickup = await Pickup.findOne({ _id: req.params.id, collectorId: req.user._id });
   if (!pickup) return res.status(404).json({ message: "Pickup not found" });
@@ -41,7 +40,6 @@ router.post("/pickups/:id/status", async (req, res) => {
     return res.status(400).json({ message: `Invalid transition from ${pickup.status} to ${status}` });
   }
   pickup.status = status;
-  if (status === "COMPLETED") pickup.completedAt = new Date();
   await pickup.save();
   res.json({ pickup });
 });
@@ -55,10 +53,7 @@ router.post("/pickups/:id/weigh", async (req, res) => {
   let finalAmount = 0;
   pickup.items = pickup.items.map(item => {
     const incoming = req.body.items.find(x => x.scrapType === item.scrapType);
-    if (incoming) {
-      item.actualWeight = Number(incoming.actualWeight || 0);
-      if (incoming.rate !== undefined) item.rate = Number(incoming.rate || 0);
-    }
+    if (incoming) item.actualWeight = Number(incoming.actualWeight || 0);
     item.amount = Number(item.actualWeight || 0) * Number(item.rate || 0);
     finalAmount += item.amount;
     return item;
