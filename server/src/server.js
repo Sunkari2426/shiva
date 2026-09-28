@@ -2,6 +2,7 @@ import http from "http";
 import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
+import helmet from "helmet";
 import { config } from "./config.js";
 import { connectDatabase } from "./db.js";
 import authRoutes from "./routes/auth.js";
@@ -17,6 +18,8 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: config.clientOrigin, methods: ["GET", "POST"] } });
 app.set("io", io);
 
+app.disable("x-powered-by");
+app.use(helmet());
 app.use(cors({ origin: config.clientOrigin }));
 app.use(express.json({ limit: "1mb" }));
 
