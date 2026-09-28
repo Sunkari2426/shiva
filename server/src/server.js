@@ -10,6 +10,7 @@ import collectorRoutes from "./routes/collector.js";
 import addressRoutes from "./routes/addresses.js";
 import scrapRoutes from "./routes/scrap.js";
 import adminRoutes from "./routes/admin.js";
+import notificationRoutes from "./routes/notifications.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -26,6 +27,7 @@ app.use("/api/addresses", addressRoutes);
 app.use("/api/scrap", scrapRoutes);
 app.use("/api/collector", collectorRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 io.on("connection", socket => {
   socket.on("pickup:join", pickupId => {
