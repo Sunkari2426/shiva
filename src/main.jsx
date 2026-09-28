@@ -41,7 +41,7 @@ function App(){
 
 function rateRows(rows){return rows.map((x,i)=>({name:x[0],rate:Number(String(x[1]).replace(/[^0-9.]/g,'')),unit:'kg',group:x[2],id:String(i)}))}
 function title(role,tab){const map={home:'Good evening 👋',book:'Book a pickup',history:'Pickup history',profile:'My profile',dashboard:role==='partner'?'Partner dashboard':'Management dashboard',requests:'Pickup requests',schedule:'Pickup schedule',earnings:'Earnings',pickups:'Pickup management',users:'Users & partners',rates:'Scrap rates',reports:'Reports & analytics',settings:'Settings'};return map[tab]||'Scrap Mama'}
-function render(role,tab,data){if(role==='customer')return tab==='home'?<CustomerHome {...data}/>:tab==='book'?<BookPickup {...data}/>:tab==='history'?<History {...data}/>:<Profile user={data.user}/>;if(role==='partner')return tab==='dashboard'?<PartnerDash pickups={data.pickups}/>:tab==='requests'?<Requests/>:tab==='schedule'?<Schedule/>:<Earnings/>;return <Admin tab={tab} pickups={data.pickups}/>}
+function render(role,tab,data){if(role==='customer')return tab==='home'?<CustomerHome {...data}/>:tab==='book'?<BookPickup {...data}/>:tab==='history'?<History {...data}/>:<Profile user={data.user}/>;if(role==='partner')return <PartnerPage tab={tab} pickups={data.pickups} refresh={data.refresh}/>;return <Admin tab={tab} pickups={data.pickups}/>}
 
 function Login({onLogin,expectedRole='customer'}){const [phone,setPhone]=useState(''),[otp,setOtp]=useState(''),[sent,setSent]=useState(false),[dev,setDev]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  async function send(){setBusy(true);setError('');try{const r=await api.requestOtp(phone);setSent(true);setDev(r.devOtp||'')}catch(e){setError(e.message)}finally{setBusy(false)}}
