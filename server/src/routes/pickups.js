@@ -1,5 +1,6 @@
 import { Router } from "express";
 import Pickup from "../models/Pickup.js";
+import Payment from "../models/Payment.js";
 import Address from "../models/Address.js";
 import { auth, requireRole } from "../middleware/auth.js";
 
@@ -10,6 +11,16 @@ router.get("/", auth, async (req, res) => {
     req.user.role === "collector" ? { collectorId: req.user._id } : {};
   const pickups = await Pickup.find(filter).sort({ createdAt: -1 }).limit(100);
   res.json({ pickups });
+});
+
+router.get("/:id", auth, async (req, res) => {
+  const filter = req.user.role === "admin" ? { _id: req.params.id } :
+    req.user.role === "collector" ? { _id: req.params.id, collectorId: req.user._id } :
+    { _id: req.params.id, customerId: req.user._id };
+  const pickup = await Pickup.findOne(filter);
+  if (!pickup) return res.status(404).json({ message: "Pickup not found" });
+  const payment = await Payment.findOne({ pickupId: pickup._id }).sort({ createdAt: -1 });
+  res.json({ pickup, payment });
 });
 
 router.post("/", auth, requireRole("customer"), async (req, res) => {
@@ -24,6 +35,24 @@ router.post("/", auth, requireRole("customer"), async (req, res) => {
     customerId: req.user._id, addressId, items, scheduledDate, scheduledTime, customerLocation, estimatedAmount
   });
   res.status(201).json({ pickup });
+});
+
+router.post("/:id/payment", auth, async (req, res) => {
+  const pickup = await Pickup.findOne({ _id: req.params.id, customerId: req.user._id });
+  if (!pickup) return res.status(404).json({ message: "Pickup not found" });
+  if (pickup.status !== "PAYMENT_PENDING") return res.status(400).json({ message: "Payment is not pending" });
+  const method = ["CASH", "UPI", "GATEWAY"].includes(req.body.method) ? req.body.method : "CASH";
+  const payment = await Payment.findOneAndUpdate(
+    { pickupId: pickup._id },
+    { pickupId: pickup._id, amount: pickup.finalAmount, method, status: "PAID", transactionId: String(req.body.transactionId || "") },
+    { upsert: true, new: true }
+  );
+  pickup.paymentStatus = "PAID";
+  pickup.status = "COMPLETED";
+  pickup.completedAt = new Date();
+  await pickup.save();
+  if (req.app.get("io")) req.app.get("io").to(String(pickup._id)).emit("pickup:completed", { pickupId: String(pickup._id), finalAmount: pickup.finalAmount });
+  res.json({ pickup, payment });
 });
 
 router.post("/:id/cancel", auth, async (req, res) => {
