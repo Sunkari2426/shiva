@@ -32,5 +32,7 @@ export const api = {
   acceptPickup: id => request(`/collector/pickups/${id}/accept`, { method: "POST" }),
   collectorStatus: (id, status) => request(`/collector/pickups/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
   weighPickup: (id, items) => request(`/collector/pickups/${id}/weigh`, { method: "POST", body: JSON.stringify({ items }) }),
-  sendLocation: (id, lat, lng) => request(`/collector/pickups/${id}/location`, { method: "POST", body: JSON.stringify({ lat, lng }) })
+  sendLocation: (id, lat, lng) => request(`/collector/pickups/${id}/location`, { method: "POST", body: JSON.stringify({ lat, lng }) }),
+  pickup: id => request(`/pickups/${id}`),
+  payPickup: (id, method="CASH") => request(`/pickups/${id}/payment`, { method: "POST", body: JSON.stringify({ method }) })
 };
