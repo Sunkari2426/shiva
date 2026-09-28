@@ -52,3 +52,9 @@ In a second terminal:
 Set `MONGODB_URI` in `server/.env`. To seed the initial demo scrap categories/rates, run `npm run seed` from the repository root after MongoDB is available.
 
 The current backend is an MVP foundation; real OTP delivery, payment gateway integration, push notifications, audit logging, production validation/security hardening and deployment configuration remain next implementation steps.
+
+## Frontend ↔ API
+
+Create a root `.env` from `.env.example` when the API is not running on `http://localhost:4000`.
+
+The customer UI now uses the backend for OTP authentication, scrap rates, addresses, pickup creation and pickup history. The API is defined under `server/` and follows the pickup lifecycle in the product requirements.
