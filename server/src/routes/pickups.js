@@ -2,11 +2,24 @@ import { Router } from "express";
 import Pickup from "../models/Pickup.js";
 import Payment from "../models/Payment.js";
 import Address from "../models/Address.js";
+import ScrapCategory from "../models/ScrapCategory.js";
+import ScrapRate from "../models/ScrapRate.js";
 import { auth, requireRole } from "../middleware/auth.js";
 import Notification from "../models/Notification.js";
 import Rating from "../models/Rating.js";
 
 const router = Router();
+
+async function getOfficialRates() {
+  const categories = await ScrapCategory.find({ isActive: true }).lean();
+  const rates = await ScrapRate.find({ isActive: true }).sort({ effectiveFrom: -1 }).lean();
+  const latest = new Map();
+  for (const rate of rates) if (!latest.has(String(rate.categoryId))) latest.set(String(rate.categoryId), rate);
+  return new Map(categories.map(category => [
+    category.name.trim().toLowerCase(),
+    { categoryId: category._id, name: category.name, rate: latest.get(String(category._id))?.rate ?? 0 }
+  ]));
+}
 
 router.get("/", auth, async (req, res) => {
   const filter = req.user.role === "customer" ? { customerId: req.user._id } :
@@ -30,11 +43,31 @@ router.post("/", auth, requireRole("customer"), async (req, res) => {
   if (!addressId || !Array.isArray(items) || !items.length || !scheduledDate || !scheduledTime) {
     return res.status(400).json({ message: "addressId, items, scheduledDate and scheduledTime are required" });
   }
+  if (items.length > 20) return res.status(400).json({ message: "Too many scrap categories" });
+
   const address = await Address.findOne({ _id: addressId, customerId: req.user._id });
   if (!address) return res.status(400).json({ message: "Invalid address" });
-  const estimatedAmount = items.reduce((sum, item) => sum + Number(item.estimatedWeight || 0) * Number(item.rate || 0), 0);
+
+  const officialRates = await getOfficialRates();
+  const normalizedItems = [];
+  for (const item of items) {
+    const scrapType = String(item.scrapType || "").trim();
+    const estimatedWeight = Number(item.estimatedWeight || 0);
+    const official = officialRates.get(scrapType.toLowerCase());
+    if (!official) return res.status(400).json({ message: `Unsupported scrap category: ${scrapType}` });
+    if (!Number.isFinite(estimatedWeight) || estimatedWeight < 0) return res.status(400).json({ message: `Invalid estimated weight for ${scrapType}` });
+    normalizedItems.push({
+      scrapType: official.name,
+      estimatedWeight,
+      actualWeight: 0,
+      rate: official.rate,
+      amount: estimatedWeight * official.rate
+    });
+  }
+
+  const estimatedAmount = normalizedItems.reduce((sum, item) => sum + item.amount, 0);
   const pickup = await Pickup.create({
-    customerId: req.user._id, addressId, items, scheduledDate, scheduledTime, customerLocation, estimatedAmount
+    customerId: req.user._id, addressId, items: normalizedItems, scheduledDate, scheduledTime, customerLocation, estimatedAmount
   });
   await Notification.create({ userId: req.user._id, type: "PICKUP_CREATED", title: "Pickup booked", message: `Your pickup ${pickup._id} has been booked.`, data: { pickupId: pickup._id } });
   res.status(201).json({ pickup });
