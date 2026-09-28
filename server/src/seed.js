@@ -22,6 +22,14 @@ for (const [name, rate] of seedData) {
   );
 }
 
+if (process.env.SEED_COLLECTOR_PHONE) {
+  await User.findOneAndUpdate(
+    { phone: process.env.SEED_COLLECTOR_PHONE },
+    { phone: process.env.SEED_COLLECTOR_PHONE, name: "Scrap Mama Collector", role: "collector", isActive: true },
+    { upsert: true, new: true }
+  );
+}
+
 if (process.env.SEED_ADMIN_PHONE) {
   await User.findOneAndUpdate(
     { phone: process.env.SEED_ADMIN_PHONE },
