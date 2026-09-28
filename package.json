@@ -16,7 +16,8 @@
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "lucide-react": "latest"
+    "lucide-react": "latest",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {}
 }
