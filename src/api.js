@@ -1,0 +1,30 @@
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+
+async function request(path, options = {}) {
+  const token = localStorage.getItem("scrap_mama_token");
+  const response = await fetch(API_BASE + path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "Request failed");
+  return data;
+}
+
+export const api = {
+  requestOtp: phone => request("/auth/request-otp", { method: "POST", body: JSON.stringify({ phone }) }),
+  verifyOtp: (phone, otp) => request("/auth/verify-otp", { method: "POST", body: JSON.stringify({ phone, otp }) }),
+  categories: () => request("/scrap/categories"),
+  addresses: () => request("/addresses"),
+  createAddress: payload => request("/addresses", { method: "POST", body: JSON.stringify(payload) }),
+  pickups: () => request("/pickups"),
+  createPickup: payload => request("/pickups", { method: "POST", body: JSON.stringify(payload) }),
+  cancelPickup: id => request(`/pickups/${id}/cancel`, { method: "POST" }),
+  adminDashboard: () => request("/admin/dashboard"),
+  adminPickups: () => request("/admin/pickups"),
+  adminUsers: () => request("/admin/users")
+};
