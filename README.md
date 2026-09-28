@@ -33,3 +33,22 @@ This first slice is a frontend prototype for rapid workflow review. The supplied
 5. Payment/transaction integration
 6. Push notifications
 7. Tests and production deployment
+
+## Backend
+
+The repository now includes a Node.js/Express API under `server/`, following the Product & Technical Requirements for MongoDB, JWT/RBAC and Socket.IO tracking.
+
+### Codespaces
+
+```bash
+npm install
+npm run dev
+```
+
+In a second terminal:
+
+```cd server && cp .env.example .env && npm install && npm run dev```
+
+Set `MONGODB_URI` in `server/.env`. To seed the initial demo scrap categories/rates, run `npm run seed` from the repository root after MongoDB is available.
+
+The current backend is an MVP foundation; real OTP delivery, payment gateway integration, push notifications, audit logging, production validation/security hardening and deployment configuration remain next implementation steps.
