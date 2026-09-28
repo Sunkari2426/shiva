@@ -26,13 +26,11 @@ Open forwarded port **5173**.
 This first slice is a frontend prototype for rapid workflow review. The supplied requirements call for Flutter customer/collector apps, a Node.js/Express API, MongoDB, JWT authentication and Socket.IO real-time tracking. Those backend/mobile boundaries can be added next without changing the product workflows.
 
 ## Next implementation slices
-1. Node.js/Express API + MongoDB models
-2. JWT/OTP authentication and role authorization
-3. Customer/partner/admin API integration
-4. Socket.IO live pickup tracking
-5. Payment/transaction integration
-6. Push notifications
-7. Tests and production deployment
+1. Real OTP provider integration
+2. Payment gateway / UPI integration
+3. Push notifications and production map provider
+4. Audit logging and distributed rate limiting
+5. Flutter mobile clients and app-store release
 
 ## Backend
 
@@ -51,7 +49,7 @@ In a second terminal:
 
 Set `MONGODB_URI` in `server/.env`. To seed the initial demo scrap categories/rates, run `npm run seed` from the repository root after MongoDB is available.
 
-The current backend is an MVP foundation; real OTP delivery, payment gateway integration, push notifications, audit logging, production validation/security hardening and deployment configuration remain next implementation steps.
+The backend now includes OTP/JWT role controls, rate protection for booking estimates, official-rate pricing, Socket.IO tracking, admin management, payment recording, ratings, security headers, deployment manifests and a Node test runner. Real OTP delivery, payment gateway integration, push notifications, production map provider and distributed rate limiting still require provider configuration.
 
 ## Frontend ↔ API
 
