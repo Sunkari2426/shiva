@@ -1,0 +1,7 @@
+{
+  "name":"Scrap Mama",
+  "image":"mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts":[5173],
+  "portsAttributes":{"5173":{"label":"Scrap Mama","onAutoForward":"openPreview"}},
+  "postCreateCommand":"npm install"
+}
