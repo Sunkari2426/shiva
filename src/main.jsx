@@ -3,6 +3,7 @@ import {io} from 'socket.io-client';
 import {createRoot} from 'react-dom/client';
 import {LayoutDashboard,Recycle,Truck,Users,MapPin,IndianRupee,ClipboardList,Bell,Settings,Menu,ArrowRight,CheckCircle2,Clock3,PackageCheck,LogIn,RefreshCw} from 'lucide-react';
 import {api} from './api';
+import AdminManagement from './AdminManagement.jsx';
 import './styles.css';
 
 const fallbackRates=[['Newspaper','₹18/kg','Paper'],['Cardboard','₹12/kg','Paper'],['Iron / Steel','₹32/kg','Metal'],['Aluminium','₹145/kg','Metal'],['Plastic','₹22/kg','Plastic'],['E-waste','₹45/kg','Special']];
@@ -15,7 +16,7 @@ function App(){
  const [role,setRole]=useState('customer'),[tab,setTab]=useState('home'),[mobile,setMobile]=useState(false);
  const [user,setUser]=useState(()=>JSON.parse(localStorage.getItem('scrap_mama_user')||'null'));
  const [rates,setRates]=useState([]),[pickups,setPickups]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const nav=role==='customer'?[['home','Home',LayoutDashboard],['book','Book Pickup',Recycle],['history','History',ClipboardList],['profile','Profile',Users]]:role==='partner'?[['dashboard','Dashboard',LayoutDashboard],['requests','Requests',PackageCheck],['schedule','Schedule',Clock3],['earnings','Earnings',IndianRupee]]:[['dashboard','Dashboard',LayoutDashboard],['pickups','Pickups',Truck],['users','Users',Users],['rates','Rates',IndianRupee],['reports','Reports',ClipboardList],['settings','Settings',Settings]];
+ const nav=role==='customer'?[['home','Home',LayoutDashboard],['book','Book Pickup',Recycle],['history','History',ClipboardList],['profile','Profile',Users]]:role==='partner'?[['dashboard','Dashboard',LayoutDashboard],['requests','Requests',PackageCheck],['schedule','Schedule',Clock3],['earnings','Earnings',IndianRupee]]:[['dashboard','Dashboard',LayoutDashboard],['pickups','Pickups',Truck],['users','Users',Users],['rates','Rates',IndianRupee],['reports','Reports',ClipboardList],['payments','Payments',IndianRupee],['complaints','Complaints',Bell],['settings','Settings',Settings]];
 
  useEffect(()=>{let live=true;(async()=>{try{const [c,p]=await Promise.all([api.categories(),user?api.pickups():Promise.resolve({pickups:[]})]);if(live){setRates(c.categories||[]);setPickups(p.pickups||[]);}}catch(e){if(live)setError(e.message)}finally{if(live)setLoading(false)}})();return()=>{live=false}},[user]);
 
@@ -41,7 +42,7 @@ function App(){
 
 function rateRows(rows){return rows.map((x,i)=>({name:x[0],rate:Number(String(x[1]).replace(/[^0-9.]/g,'')),unit:'kg',group:x[2],id:String(i)}))}
 function title(role,tab){const map={home:'Good evening 👋',book:'Book a pickup',history:'Pickup history',profile:'My profile',dashboard:role==='partner'?'Partner dashboard':'Management dashboard',requests:'Pickup requests',schedule:'Pickup schedule',earnings:'Earnings',pickups:'Pickup management',users:'Users & partners',rates:'Scrap rates',reports:'Reports & analytics',settings:'Settings'};return map[tab]||'Scrap Mama'}
-function render(role,tab,data){if(role==='customer')return tab==='home'?<CustomerHome {...data}/>:tab==='book'?<BookPickup {...data}/>:tab==='history'?<History {...data}/>:<Profile user={data.user}/>;if(role==='partner')return <PartnerPage tab={tab} pickups={data.pickups} refresh={data.refresh}/>;return <Admin tab={tab} pickups={data.pickups}/>}
+function render(role,tab,data){if(role==='customer')return tab==='home'?<CustomerHome {...data}/>:tab==='book'?<BookPickup {...data}/>:tab==='history'?<History {...data}/>:<Profile user={data.user}/>;if(role==='partner')return <PartnerPage tab={tab} pickups={data.pickups} refresh={data.refresh}/>;return <AdminManagement tab={tab} fallbackPickups={data.pickups}/>}
 
 function Login({onLogin,expectedRole='customer'}){const [phone,setPhone]=useState(''),[otp,setOtp]=useState(''),[sent,setSent]=useState(false),[dev,setDev]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  async function send(){setBusy(true);setError('');try{const r=await api.requestOtp(phone);setSent(true);setDev(r.devOtp||'')}catch(e){setError(e.message)}finally{setBusy(false)}}
