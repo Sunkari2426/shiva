@@ -1,8 +1,15 @@
 function resolveApiBase() {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL.replace(/\/$/, "");
-  if (typeof window !== "undefined" && window.location.hostname.endsWith(".app.github.dev")) {
-    return `https://${window.location.hostname.replace(/-5173(?=\\.)/, "-4000")}/api`;
+  const configured = import.meta.env.VITE_API_URL;
+  if (configured) return configured.replace(/\/$/, "");
+
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.endsWith(".app.github.dev")) {
+      const apiHost = host.replace("-5173.app.github.dev", "-4000.app.github.dev");
+      return `https://${apiHost}/api`;
+    }
   }
+
   return "/api";
 }
 
@@ -10,17 +17,30 @@ const API_BASE = resolveApiBase();
 
 async function request(path, options = {}) {
   const token = localStorage.getItem("scrap_mama_token");
-  const response = await fetch(API_BASE + path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {})
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(API_BASE + path, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {})
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || `Request failed (${response.status})`);
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Backend request timed out. Make sure port 4000 is running and public in Codespaces.");
     }
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || "Request failed");
-  return data;
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export const api = {
