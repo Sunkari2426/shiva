@@ -71,7 +71,7 @@ function Tracking({pickupId,onClose}){
  const [pickup,setPickup]=useState(null),[location,setLocation]=useState(null),[busy,setBusy]=useState(false),[receipt,setReceipt]=useState(false);
  useEffect(()=>{let socket;
   api.pickup(pickupId).then(r=>setPickup(r.pickup)).catch(()=>{});
-  const base=(import.meta.env.VITE_API_URL||'http://localhost:4000/api').replace(/\/api$/,'');
+  const base=import.meta.env.VITE_API_URL?.replace(/\/api$/,'') || window.location.origin;
   socket=io(base); socket.emit('pickup:join',pickupId);
   socket.on('collector:location',data=>setLocation(data));
   socket.on('pickup:completed',()=>api.pickup(pickupId).then(r=>setPickup(r.pickup)));
