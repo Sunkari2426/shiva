@@ -15,12 +15,30 @@ import notificationRoutes from "./routes/notifications.js";
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: config.clientOrigin, methods: ["GET", "POST"] } });
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (origin === config.clientOrigin) return true;
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" && url.hostname.endsWith(".app.github.dev");
+  } catch {
+    return false;
+  }
+}
+
+const corsOptions = {
+  origin: (origin, callback) => callback(null, isAllowedOrigin(origin)),
+  methods: ["GET", "POST", "PATCH", "OPTIONS"],
+  credentials: true
+};
+
+const io = new Server(server, { cors: corsOptions });
 app.set("io", io);
 
 app.disable("x-powered-by");
 app.use(helmet());
-app.use(cors({ origin: config.clientOrigin }));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "scrap-mama-api" }));
