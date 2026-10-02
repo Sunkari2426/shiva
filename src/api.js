@@ -1,4 +1,12 @@
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+function resolveApiBase() {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL.replace(/\/$/, "");
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".app.github.dev")) {
+    return `https://${window.location.hostname.replace(/-5173(?=\\.)/, "-4000")}/api`;
+  }
+  return "/api";
+}
+
+const API_BASE = resolveApiBase();
 
 async function request(path, options = {}) {
   const token = localStorage.getItem("scrap_mama_token");
