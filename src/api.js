@@ -2,14 +2,8 @@ function resolveApiBase() {
   const configured = import.meta.env.VITE_API_URL;
   if (configured) return configured.replace(/\/$/, "");
 
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname;
-    if (host.endsWith(".app.github.dev")) {
-      const apiHost = host.replace("-5173.app.github.dev", "-4000.app.github.dev");
-      return `https://${apiHost}/api`;
-    }
-  }
-
+  // In Codespaces/dev, use Vite's same-origin proxy.
+  // This avoids browser-to-browser forwarded-port/CORS issues.
   return "/api";
 }
 
