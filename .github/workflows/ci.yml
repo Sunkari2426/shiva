@@ -26,7 +26,9 @@ jobs:
         with:
           node-version: 22
       - run: cd server && npm install
+      - run: npm --prefix server test
       - run: node --check server/src/server.js
+      - run: node --check server/src/services/otp.js
       - run: node --check server/src/routes/auth.js
       - run: node --check server/src/routes/pickups.js
       - run: node --check server/src/routes/collector.js
