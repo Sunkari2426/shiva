@@ -7,23 +7,30 @@ import { auth, requireRole } from "../middleware/auth.js";
 const router = Router();
 router.use(auth, requireRole("collector"));
 
-router.get("/requests", async (req, res) => {
-  const pickups = await Pickup.find({ status: { $in: ["PENDING", "ASSIGNED"] } }).sort({ scheduledDate: 1 }).limit(100);
+router.get("/requests", async (_req, res) => {
+  const pickups = await Pickup.find({ status: { $in: ["PENDING", "ASSIGNED"] } })
+    .sort({ scheduledDate: 1 }).limit(100);
   res.json({ pickups });
 });
 
 router.get("/pickups", async (req, res) => {
-  const pickups = await Pickup.find({ collectorId: req.user._id }).sort({ scheduledDate: -1 }).limit(100);
+  const pickups = await Pickup.find({ collectorId: req.user._id })
+    .sort({ scheduledDate: -1 }).limit(100);
   res.json({ pickups });
 });
 
 router.post("/pickups/:id/accept", async (req, res) => {
   const pickup = await Pickup.findOneAndUpdate(
-    { _id: req.params.id, status: { $in: ["PENDING", "ASSIGNED"] }, $or: [{ collectorId: { $exists: false } }, { collectorId: null }] },
+    {
+      _id: req.params.id,
+      status: { $in: ["PENDING", "ASSIGNED"] },
+      $or: [{ collectorId: { $exists: false } }, { collectorId: null }]
+    },
     { collectorId: req.user._id, status: "ACCEPTED" },
     { new: true }
   );
   if (!pickup) return res.status(404).json({ message: "Pickup is no longer available" });
+
   await Notification.create({
     userId: pickup.customerId,
     type: "PICKUP_ACCEPTED",
@@ -39,22 +46,27 @@ router.post("/pickups/:id/status", async (req, res) => {
   const transitions = {
     ACCEPTED: ["EN_ROUTE"],
     EN_ROUTE: ["ARRIVED"],
-    ARRIVED: ["WEIGHING"],
-    WEIGHING: ["PAYMENT_PENDING"]
+    ARRIVED: ["WEIGHING"]
   };
-  const pickup = await Pickup.findOne({ _id: req.params.id, collectorId: req.user._id });
+
+  const pickup = await Pickup.findOne({
+    _id: req.params.id,
+    collectorId: req.user._id
+  });
   if (!pickup) return res.status(404).json({ message: "Pickup not found" });
   if (!transitions[pickup.status]?.includes(status)) {
     return res.status(400).json({ message: `Invalid transition from ${pickup.status} to ${status}` });
   }
+
   pickup.status = status;
   await pickup.save();
+
   const messages = {
     EN_ROUTE: ["Partner is on the way", `Your partner is on the way for pickup ${pickup._id}.`],
     ARRIVED: ["Partner arrived", `Your partner has arrived for pickup ${pickup._id}.`],
     WEIGHING: ["Scrap weighing started", `Weighing has started for pickup ${pickup._id}.`]
   };
-  const [title, message] = messages[status] || ["Pickup updated", `Pickup ${pickup._id} is now ${status}.`];
+  const [title, message] = messages[status];
   await Notification.create({
     userId: pickup.customerId,
     type: `PICKUP_${status}`,
@@ -62,52 +74,96 @@ router.post("/pickups/:id/status", async (req, res) => {
     message,
     data: { pickupId: pickup._id, status }
   });
+
   res.json({ pickup });
 });
 
 router.post("/pickups/:id/weigh", async (req, res) => {
-  const pickup = await Pickup.findOne({ _id: req.params.id, collectorId: req.user._id });
+  const pickup = await Pickup.findOne({
+    _id: req.params.id,
+    collectorId: req.user._id
+  });
   if (!pickup) return res.status(404).json({ message: "Pickup not found" });
-  if (!["WEIGHING", "ARRIVED"].includes(pickup.status)) return res.status(400).json({ message: "Pickup is not ready for weighing" });
-  if (!Array.isArray(req.body.items) || !req.body.items.length) return res.status(400).json({ message: "items are required" });
-  if (req.body.items.length !== pickup.items.length) return res.status(400).json({ message: "All pickup items must be weighed" });
+  if (pickup.status !== "WEIGHING") {
+    return res.status(400).json({ message: "Pickup must be in WEIGHING status" });
+  }
+  if (!Array.isArray(req.body.items) || !req.body.items.length) {
+    return res.status(400).json({ message: "items are required" });
+  }
+  if (req.body.items.length !== pickup.items.length) {
+    return res.status(400).json({ message: "All pickup items must be weighed" });
+  }
 
   const seen = new Set();
   let finalAmount = 0;
+
   for (const incoming of req.body.items) {
     const key = String(incoming.scrapType || "").trim().toLowerCase();
-    if (!key || seen.has(key)) return res.status(400).json({ message: "Each scrap category must appear exactly once" });
+    if (!key || seen.has(key)) {
+      return res.status(400).json({ message: "Each scrap category must appear exactly once" });
+    }
     seen.add(key);
+
     const item = pickup.items.find(x => x.scrapType.toLowerCase() === key);
-    if (!item) return res.status(400).json({ message: `Invalid scrap category: ${incoming.scrapType}` });
+    if (!item) {
+      return res.status(400).json({ message: `Invalid scrap category: ${incoming.scrapType}` });
+    }
+
     const actualWeight = Number(incoming.actualWeight);
-    if (!Number.isFinite(actualWeight) || actualWeight < 0) {
+    if (!Number.isFinite(actualWeight) || actualWeight < 0 || actualWeight > 10000) {
       return res.status(400).json({ message: `Invalid actual weight for ${item.scrapType}` });
     }
+
     item.actualWeight = actualWeight;
-    item.amount = actualWeight * Number(item.rate || 0);
+    item.amount = Math.round(actualWeight * Number(item.rate || 0) * 100) / 100;
     finalAmount += item.amount;
   }
-  pickup.finalAmount = finalAmount;
+
+  pickup.finalAmount = Math.round(finalAmount * 100) / 100;
   pickup.status = "PAYMENT_PENDING";
   await pickup.save();
+
   await Notification.create({
     userId: pickup.customerId,
     type: "PAYMENT_PENDING",
     title: "Final amount ready",
-    message: `Pickup ${pickup._id} is weighed. Final amount is ₹${finalAmount}.`,
-    data: { pickupId: pickup._id, finalAmount }
+    message: `Pickup ${pickup._id} is weighed. Final amount is ₹${pickup.finalAmount}.`,
+    data: { pickupId: pickup._id, finalAmount: pickup.finalAmount }
   });
+
   res.json({ pickup });
 });
 
 router.post("/pickups/:id/location", async (req, res) => {
-  const lat = Number(req.body.lat), lng = Number(req.body.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return res.status(400).json({ message: "Valid lat/lng required" });
-  const pickup = await Pickup.findOne({ _id: req.params.id, collectorId: req.user._id, status: { $in: ["EN_ROUTE", "ARRIVED"] } });
+  const lat = Number(req.body.lat);
+  const lng = Number(req.body.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+      lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return res.status(400).json({ message: "Valid latitude/longitude required" });
+  }
+
+  const pickup = await Pickup.findOne({
+    _id: req.params.id,
+    collectorId: req.user._id,
+    status: { $in: ["EN_ROUTE", "ARRIVED"] }
+  });
   if (!pickup) return res.status(404).json({ message: "Active pickup not found" });
-  const location = await CollectorLocation.create({ collectorId: req.user._id, pickupId: pickup._id, lat, lng });
-  req.app.get("io").to(String(pickup._id)).emit("collector:location", { pickupId: String(pickup._id), lat, lng, recordedAt: location.recordedAt });
+
+  const location = await CollectorLocation.create({
+    collectorId: req.user._id,
+    pickupId: pickup._id,
+    lat,
+    lng
+  });
+
+  req.app.get("io").to(String(pickup._id)).emit("collector:location", {
+    pickupId: String(pickup._id),
+    lat,
+    lng,
+    recordedAt: location.recordedAt
+  });
+
   res.json({ location });
 });
 
