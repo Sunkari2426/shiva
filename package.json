@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "dev:api": "npm --prefix server run dev",
     "start:api": "npm --prefix server start",
+    "test": "npm --prefix server test",
     "seed": "npm --prefix server exec node src/seed.js"
   },
   "dependencies": {
