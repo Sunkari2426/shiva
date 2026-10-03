@@ -2,6 +2,7 @@ import { Router } from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { config } from "../config.js";
+import { deliverOtp } from "../services/otp.js";
 
 const router = Router();
 const pendingOtps = new Map();
@@ -24,31 +25,78 @@ function allowAttempt(key, limit, windowMs) {
   return true;
 }
 
-router.post("/request-otp", async (req, res) => {
-  const phone = normalizePhone(req.body.phone);
-  if (!validPhone(phone)) return res.status(400).json({ message: "Enter a valid mobile number" });
-  if (!allowAttempt(`send:${phone}`, 5, 10 * 60 * 1000)) return res.status(429).json({ message: "Too many OTP requests. Try again later." });
-  const otp = config.otpMode === "dev" ? "123456" : String(Math.floor(100000 + Math.random() * 900000));
-  pendingOtps.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000, attempts: 0 });
-  res.json({ message: "OTP sent", devOtp: config.otpMode === "dev" ? otp : undefined });
+const cleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [phone, record] of pendingOtps) {
+    if (record.expiresAt < now) pendingOtps.delete(phone);
+  }
+  for (const [key, values] of attempts) {
+    const recent = values.filter(t => now - t < 10 * 60 * 1000);
+    if (recent.length) attempts.set(key, recent);
+    else attempts.delete(key);
+  }
+}, 60_000);
+cleanup.unref();
+
+router.post("/request-otp", async (req, res, next) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+    if (!validPhone(phone)) return res.status(400).json({ message: "Enter a valid mobile number" });
+    if (!allowAttempt(`send:${phone}`, 5, 10 * 60 * 1000)) {
+      return res.status(429).json({ message: "Too many OTP requests. Try again later." });
+    }
+
+    const otp = config.otpMode === "dev"
+      ? "123456"
+      : String(Math.floor(100000 + Math.random() * 900000));
+
+    await deliverOtp({ phone, otp, config });
+    pendingOtps.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000, attempts: 0 });
+
+    res.json({
+      message: "OTP sent",
+      devOtp: config.otpMode === "dev" ? otp : undefined
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.post("/verify-otp", async (req, res) => {
-  const phone = normalizePhone(req.body.phone);
-  const otp = String(req.body.otp || "").trim();
-  if (!validPhone(phone) || !/^\d{6}$/.test(otp)) return res.status(400).json({ message: "Invalid phone or OTP" });
-  if (!allowAttempt(`verify:${phone}`, 10, 10 * 60 * 1000)) return res.status(429).json({ message: "Too many verification attempts. Try again later." });
-  const record = pendingOtps.get(phone);
-  if (!record || record.expiresAt < Date.now() || record.otp !== otp || record.attempts >= 5) {
-    if (record) record.attempts += 1;
-    return res.status(400).json({ message: "Invalid or expired OTP" });
+router.post("/verify-otp", async (req, res, next) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+    const otp = String(req.body.otp || "").trim();
+    if (!validPhone(phone) || !/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ message: "Invalid phone or OTP" });
+    }
+    if (!allowAttempt(`verify:${phone}`, 10, 10 * 60 * 1000)) {
+      return res.status(429).json({ message: "Too many verification attempts. Try again later." });
+    }
+
+    const record = pendingOtps.get(phone);
+    if (!record || record.expiresAt < Date.now() || record.otp !== otp || record.attempts >= 5) {
+      if (record) record.attempts += 1;
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    pendingOtps.delete(phone);
+    let user = await User.findOne({ phone });
+    if (!user) user = await User.create({ phone, role: "customer" });
+    if (user.isActive === false) return res.status(403).json({ message: "Account is inactive" });
+
+    const token = jwt.sign(
+      { userId: user._id.toString(), role: user.role },
+      config.jwtSecret,
+      { expiresIn: "2h" }
+    );
+
+    res.json({
+      token,
+      user: { id: user._id, phone: user.phone, name: user.name, role: user.role }
+    });
+  } catch (error) {
+    next(error);
   }
-  pendingOtps.delete(phone);
-  let user = await User.findOne({ phone });
-  if (!user) user = await User.create({ phone, role: "customer" });
-  if (user.isActive === false) return res.status(403).json({ message: "Account is inactive" });
-  const token = jwt.sign({ userId: user._id.toString(), role: user.role }, config.jwtSecret, { expiresIn: "2h" });
-  res.json({ token, user: { id: user._id, phone: user.phone, name: user.name, role: user.role } });
 });
 
 export default router;
