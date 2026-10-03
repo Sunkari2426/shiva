@@ -2,8 +2,13 @@ function resolveApiBase() {
   const configured = import.meta.env.VITE_API_URL;
   if (configured) return configured.replace(/\/$/, "");
 
-  // In Codespaces/dev, use Vite's same-origin proxy.
-  // This avoids browser-to-browser forwarded-port/CORS issues.
+  // Codespaces public preview: call the public backend port directly.
+  // This avoids browser/proxy differences in the embedded Simple Browser.
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".app.github.dev")) {
+    const host = window.location.hostname.replace(/-5173(?=\.)/, "-4000");
+    return `https://${host}/api`;
+  }
+
   return "/api";
 }
 
