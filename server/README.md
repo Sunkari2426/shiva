@@ -1,6 +1,6 @@
 # Scrap Mama API
 
-Node.js + Express + MongoDB + Socket.IO backend foundation for the Scrap Mama platform.
+Node.js + Express + MongoDB + Socket.IO backend for the Scrap Mama platform.
 
 ## Run in Codespaces
 
@@ -11,17 +11,40 @@ npm install
 npm run dev
 ```
 
-Set `MONGODB_URI` to your MongoDB connection string. The default local URI works only when MongoDB is running in the same environment.
+The API listens on port **4000**.
 
-## API foundation
+Health:
+`GET /api/health`
 
-- OTP request/verification (development OTP is `123456` when `OTP_MODE=dev`)
-- JWT authentication and customer/collector/admin roles
-- Scrap categories and admin-managed rates
-- Customer addresses
-- Pickup creation, listing and cancellation
-- Collector pickup acceptance, status updates and GPS location
-- Admin dashboard, pickup and user endpoints
-- Socket.IO pickup rooms for live collector location
+Development OTP:
+`OTP_MODE=dev` returns development OTP **123456** in the API response.
 
-This is an MVP backend foundation. Production OTP delivery, payment gateway, push notifications, stronger validation, audit logs and hardened security still need to be added.
+Production OTP:
+`OTP_MODE=webhook` requires:
+- `OTP_WEBHOOK_URL`
+- optional `OTP_WEBHOOK_TOKEN`
+
+The webhook receives JSON:
+`{ "phone": "...", "otp": "123456" }`
+
+## Test
+
+```bash
+npm test
+```
+
+Tests currently cover the documented Pickup lifecycle/model requirements. CI also runs syntax checks.
+
+## Security
+
+The API includes:
+- JWT/RBAC
+- OTP throttling and cleanup
+- API rate limiting
+- Helmet
+- CORS validation
+- input validation
+- server-side official scrap-rate calculation
+- operational-only collector location updates
+
+Production still needs the selected SMS/payment/map/push providers and distributed infrastructure configuration.
