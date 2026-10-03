@@ -14,6 +14,8 @@ export const config = {
   mongoUri: process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/scrap_mama",
   jwtSecret,
   clientOrigin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
-  otpMode: process.env.OTP_MODE || (isProduction ? "provider" : "dev"),
+  otpMode: process.env.OTP_MODE || (isProduction ? "webhook" : "dev"),
+  otpWebhookUrl: process.env.OTP_WEBHOOK_URL || "",
+  otpWebhookToken: process.env.OTP_WEBHOOK_TOKEN || "",
   isProduction
 };
