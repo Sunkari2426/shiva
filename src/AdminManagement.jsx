@@ -14,6 +14,7 @@ export default function AdminManagement({tab,fallbackPickups=[]}){
  if(tab==='reports')return <Reports data={data}/>;
  if(tab==='payments')return <Payments rows={data?.payments||[]}/>;
  if(tab==='complaints')return <Complaints rows={data?.complaints||[]}/>;
+ if(tab==='settings')return <Settings/>;
  if(tab==='pickups')return <Pickups rows={rows}/>;
  return <Dashboard data={data} rows={rows}/>;
 }
@@ -24,3 +25,25 @@ function Rates({rows}){const [saving,setSaving]=useState('');async function save
 function Reports({data}){const d=data?.dashboard||{},rs=data?.ratings||[];const avg=rs.length?(rs.reduce((a,x)=>a+x.rating,0)/rs.length).toFixed(1):'—';return <><div className="stats"><Stat label="Scrap collected" value={Math.round(d.scrapKg||0)+' kg'} icon={Recycle}/><Stat label="Completed" value={d.completed||0} icon={CheckCircle2}/><Stat label="Avg rating" value={avg} icon={PackageCheck}/><Stat label="Completion rate" value={d.pickups?Math.round(d.completed/d.pickups*100)+'%':'—'} icon={IndianRupee}/></div><div className="panel"><h3>Ratings</h3>{rs.map(r=><div className="listRow" key={r._id}><div><b>{r.rating}/5</b><small>{r.comment||'No comment'} · Pickup {r.pickupId}</small></div></div>)}</div></>}
 function Payments({rows}){return <div className="panel"><h3>Payments & transactions</h3>{rows.map(p=><div className="listRow" key={p._id}><div><b>₹{Math.round(p.amount)}</b><small>Pickup {p.pickupId} · {p.method} · {p.status}</small></div><span className="pill">{new Date(p.createdAt).toLocaleDateString()}</span></div>)}</div>}
 function Complaints({rows}){const [busy,setBusy]=useState('');async function update(id,status){setBusy(id);try{await api.updateComplaint(id,status);window.location.reload()}catch(e){alert(e.message)}finally{setBusy('')}}return <div className="panel"><h3>Complaints</h3>{rows.map(c=><div className="listRow" key={c._id}><div><b>{c.subject}</b><small>{c.description} · {c.status}</small></div><select value={c.status} disabled={busy===c._id} onChange={e=>update(c._id,e.target.value)}><option>OPEN</option><option>IN_REVIEW</option><option>RESOLVED</option><option>CLOSED</option></select></div>)}</div>}
+
+
+function Settings(){
+ return <div className="two">
+  <div className="panel">
+   <div className="panelHead"><div><h3>Platform settings</h3><p>Operational controls and launch configuration.</p></div></div>
+   <div className="setting"><div><b>Live partner location</b><p>Location is accepted only while a pickup is EN_ROUTE or ARRIVED.</p></div><span className="pill blue">Protected</span></div>
+   <div className="setting"><div><b>Official scrap rates</b><p>Rates are stored in MongoDB and controlled through the admin rate module.</p></div><span className="pill blue">DB managed</span></div>
+   <div className="setting"><div><b>OTP mode</b><p>Development mode uses OTP 123456. Production SMS provider integration is still required before launch.</p></div><span className="pill">Dev</span></div>
+  </div>
+  <div className="panel">
+   <h3>Launch checklist</h3>
+   <ul>
+    <li>Production OTP provider</li>
+    <li>UPI/payment gateway</li>
+    <li>Maps provider and navigation</li>
+    <li>Push notifications</li>
+    <li>Production secrets and backups</li>
+   </ul>
+  </div>
+ </div>
+}
