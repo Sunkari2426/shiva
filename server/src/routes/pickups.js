@@ -88,6 +88,15 @@ router.post("/:id/payment", auth, async (req, res) => {
   pickup.completedAt = new Date();
   await pickup.save();
   await Notification.create({ userId: req.user._id, type: "PICKUP_COMPLETED", title: "Pickup completed", message: `Pickup ${pickup._id} completed. Final amount ₹${pickup.finalAmount}.`, data: { pickupId: pickup._id, finalAmount: pickup.finalAmount } });
+  if (pickup.collectorId) {
+    await Notification.create({
+      userId: pickup.collectorId,
+      type: "PICKUP_COMPLETED",
+      title: "Pickup completed",
+      message: `Pickup ${pickup._id} payment was confirmed and the pickup is complete.`,
+      data: { pickupId: pickup._id, finalAmount: pickup.finalAmount }
+    });
+  }
   if (req.app.get("io")) req.app.get("io").to(String(pickup._id)).emit("pickup:completed", { pickupId: String(pickup._id), finalAmount: pickup.finalAmount });
   res.json({ pickup, payment });
 });
@@ -112,6 +121,24 @@ router.post("/:id/cancel", auth, async (req, res) => {
   if (["COMPLETED", "CANCELLED"].includes(pickup.status)) return res.status(400).json({ message: "Pickup cannot be cancelled" });
   pickup.status = "CANCELLED";
   await pickup.save();
+  if (pickup.collectorId) {
+    await Notification.create({
+      userId: pickup.collectorId,
+      type: "PICKUP_CANCELLED",
+      title: "Pickup cancelled",
+      message: `Pickup ${pickup._id} was cancelled by the customer.`,
+      data: { pickupId: pickup._id }
+    });
+  }
+  if (req.user.role !== "customer") {
+    await Notification.create({
+      userId: pickup.customerId,
+      type: "PICKUP_CANCELLED",
+      title: "Pickup cancelled",
+      message: `Pickup ${pickup._id} was cancelled.`,
+      data: { pickupId: pickup._id }
+    });
+  }
   res.json({ pickup });
 });
 
