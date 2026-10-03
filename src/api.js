@@ -1,14 +1,8 @@
 function resolveApiBase() {
+  // In Codespaces the Vite dev server already proxies /api to the backend.
+  // Keeping API calls same-origin avoids public-port/CORS problems.
   const configured = import.meta.env.VITE_API_URL;
   if (configured) return configured.replace(/\/$/, "");
-
-  // Codespaces public preview: call the public backend port directly.
-  // This avoids browser/proxy differences in the embedded Simple Browser.
-  if (typeof window !== "undefined" && window.location.hostname.endsWith(".app.github.dev")) {
-    const host = window.location.hostname.replace(/-5173(?=\.)/, "-4000");
-    return `https://${host}/api`;
-  }
-
   return "/api";
 }
 
@@ -34,7 +28,10 @@ async function request(path, options = {}) {
     return data;
   } catch (error) {
     if (error.name === "AbortError") {
-      throw new Error("Backend request timed out. Make sure port 4000 is running and public in Codespaces.");
+      throw new Error("Backend request timed out. Check that the API server is running.");
+    }
+    if (error instanceof TypeError && /fetch/i.test(error.message)) {
+      throw new Error("Unable to reach the API. Refresh the page and make sure the backend is running.");
     }
     throw error;
   } finally {
@@ -63,7 +60,7 @@ export const api = {
   collectorRequests: () => request("/collector/requests"),
   collectorPickups: () => request("/collector/pickups"),
   acceptPickup: id => request(`/collector/pickups/${id}/accept`, { method: "POST" }),
-  collectorStatus: (id, status) => request(`/collector/pickups/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
+  collectorStatus: (id, status) => request(`/collector/pickups/${id}/status`, { method: "POST" }),
   weighPickup: (id, items) => request(`/collector/pickups/${id}/weigh`, { method: "POST", body: JSON.stringify({ items }) }),
   sendLocation: (id, lat, lng) => request(`/collector/pickups/${id}/location`, { method: "POST", body: JSON.stringify({ lat, lng }) }),
   pickup: id => request(`/pickups/${id}`),
