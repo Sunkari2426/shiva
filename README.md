@@ -2,57 +2,104 @@
 
 Scrap Mama is a doorstep scrap-pickup platform prototype based on the supplied Product & Technical Requirements.
 
-## Experiences
-- Customer App: rates, booking, address, pickup history and profile
-- Partner App: requests, schedule, active pickup, weighing/pricing concepts and earnings
-- Admin / Management: dashboard, pickup operations, users, scrap rates, reports and settings
-
-## Product rules represented
-- Pickup lifecycle: PENDING → ASSIGNED → ACCEPTED → EN_ROUTE → ARRIVED → WEIGHING → PAYMENT_PENDING → COMPLETED
-- CANCELLED is a terminal alternative
-- Final amount = actual collected weight × applicable scrap rate
-- Official rates are managed by administrators
-- Live location is an operational feature placeholder in this UI
-
 ## Run in GitHub Codespaces
 
-    npm install
-    npm run dev
+The project uses two processes during local development.
 
-Open forwarded port **5173**.
-
-## Current architecture
-
-This first slice is a frontend prototype for rapid workflow review. The supplied requirements call for Flutter customer/collector apps, a Node.js/Express API, MongoDB, JWT authentication and Socket.IO real-time tracking. Those backend/mobile boundaries can be added next without changing the product workflows.
-
-## Next implementation slices
-1. Real OTP provider integration
-2. Payment gateway / UPI integration
-3. Push notifications and production map provider
-4. Audit logging and distributed rate limiting
-5. Flutter mobile clients and app-store release
-
-## Backend
-
-The repository now includes a Node.js/Express API under `server/`, following the Product & Technical Requirements for MongoDB, JWT/RBAC and Socket.IO tracking.
-
-### Codespaces
-
+Terminal 1 — API:
 ```bash
+cd /workspaces/shiva/server
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-In a second terminal:
+Terminal 2 — web app:
+```bash
+cd /workspaces/shiva
+npm install
+npm run dev
+```
 
-```cd server && cp .env.example .env && npm install && npm run dev```
+Open forwarded port **5173**. API health is available on forwarded port **4000** at `/api/health`.
 
-Set `MONGODB_URI` in `server/.env`. To seed the initial demo scrap categories/rates, run `npm run seed` from the repository root after MongoDB is available.
+The frontend automatically derives the Codespaces API URL from the 5173/4000 forwarded ports when `VITE_API_URL` is blank.
 
-The backend now includes OTP/JWT role controls, rate protection for booking estimates, official-rate pricing, Socket.IO tracking, admin management, payment recording, ratings, security headers, deployment manifests and a Node test runner. Real OTP delivery, payment gateway integration, push notifications, production map provider and distributed rate limiting still require provider configuration.
+### Stop old ports
 
-## Frontend ↔ API
+If a previous process is holding a port:
 
-Create a root `.env` from `.env.example` when the API is not running on `http://localhost:4000`.
+```bash
+lsof -i :4000 -t | xargs -r kill
+lsof -i :5173 -t | xargs -r kill
+```
 
-The customer UI now uses the backend for OTP authentication, scrap rates, addresses, pickup creation and pickup history. The API is defined under `server/` and follows the pickup lifecycle in the product requirements.
+Or inspect first:
+
+```bash
+lsof -i :4000
+lsof -i :5173
+```
+
+Then restart the two terminals.
+
+## Development OTP
+
+With `OTP_MODE=dev`, the development OTP is **123456**. No SMS is sent in dev mode.
+
+Production uses `OTP_MODE=webhook` and requires `OTP_WEBHOOK_URL` (and optionally `OTP_WEBHOOK_TOKEN`) to point to the chosen SMS provider adapter.
+
+## Product workflow
+
+Customer:
+`PENDING → ASSIGNED → ACCEPTED → EN_ROUTE → ARRIVED → WEIGHING → PAYMENT_PENDING → COMPLETED`
+
+`CANCELLED` is terminal. Final amount is calculated server-side from actual weight × official admin-managed rate.
+
+Partner:
+- accept pickup
+- advance operational status
+- record actual weights
+- share location only during EN_ROUTE/ARRIVED
+- wait for customer payment after weighing
+
+Admin:
+- dashboard
+- pickups
+- users/partners
+- rates
+- payments
+- complaints
+- ratings
+- reports/settings foundations
+
+## Validation and security
+
+- JWT + role-based access control
+- OTP request/verification throttling
+- API request rate limiting
+- Helmet security headers
+- Codespaces CORS support
+- server-side official-rate pricing
+- latitude/longitude validation
+- pickup/weight limits
+- payment confirmation is customer-controlled
+- completed pickup cannot be completed by the partner directly
+
+## CI
+
+GitHub Actions runs:
+- frontend production build
+- backend Node tests
+- backend syntax checks
+
+## Production items requiring provider configuration
+
+The codebase has provider boundaries for:
+- real SMS/OTP delivery
+- payment gateway / UPI
+- map rendering/provider
+- push notifications
+- distributed rate limiting and audit infrastructure
+
+Provider credentials should be supplied through environment variables; secrets must not be committed.
