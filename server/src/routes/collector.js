@@ -1,6 +1,7 @@
 import { Router } from "express";
 import Pickup from "../models/Pickup.js";
 import CollectorLocation from "../models/CollectorLocation.js";
+import Notification from "../models/Notification.js";
 import { auth, requireRole } from "../middleware/auth.js";
 
 const router = Router();
@@ -23,6 +24,13 @@ router.post("/pickups/:id/accept", async (req, res) => {
     { new: true }
   );
   if (!pickup) return res.status(404).json({ message: "Pickup is no longer available" });
+  await Notification.create({
+    userId: pickup.customerId,
+    type: "PICKUP_ACCEPTED",
+    title: "Partner accepted your pickup",
+    message: `Pickup ${pickup._id} has been accepted by a partner.`,
+    data: { pickupId: pickup._id }
+  });
   res.json({ pickup });
 });
 
@@ -41,6 +49,19 @@ router.post("/pickups/:id/status", async (req, res) => {
   }
   pickup.status = status;
   await pickup.save();
+  const messages = {
+    EN_ROUTE: ["Partner is on the way", `Your partner is on the way for pickup ${pickup._id}.`],
+    ARRIVED: ["Partner arrived", `Your partner has arrived for pickup ${pickup._id}.`],
+    WEIGHING: ["Scrap weighing started", `Weighing has started for pickup ${pickup._id}.`]
+  };
+  const [title, message] = messages[status] || ["Pickup updated", `Pickup ${pickup._id} is now ${status}.`];
+  await Notification.create({
+    userId: pickup.customerId,
+    type: `PICKUP_${status}`,
+    title,
+    message,
+    data: { pickupId: pickup._id, status }
+  });
   res.json({ pickup });
 });
 
@@ -49,18 +70,34 @@ router.post("/pickups/:id/weigh", async (req, res) => {
   if (!pickup) return res.status(404).json({ message: "Pickup not found" });
   if (!["WEIGHING", "ARRIVED"].includes(pickup.status)) return res.status(400).json({ message: "Pickup is not ready for weighing" });
   if (!Array.isArray(req.body.items) || !req.body.items.length) return res.status(400).json({ message: "items are required" });
+  if (req.body.items.length !== pickup.items.length) return res.status(400).json({ message: "All pickup items must be weighed" });
 
+  const seen = new Set();
   let finalAmount = 0;
-  pickup.items = pickup.items.map(item => {
-    const incoming = req.body.items.find(x => x.scrapType === item.scrapType);
-    if (incoming) item.actualWeight = Number(incoming.actualWeight || 0);
-    item.amount = Number(item.actualWeight || 0) * Number(item.rate || 0);
+  for (const incoming of req.body.items) {
+    const key = String(incoming.scrapType || "").trim().toLowerCase();
+    if (!key || seen.has(key)) return res.status(400).json({ message: "Each scrap category must appear exactly once" });
+    seen.add(key);
+    const item = pickup.items.find(x => x.scrapType.toLowerCase() === key);
+    if (!item) return res.status(400).json({ message: `Invalid scrap category: ${incoming.scrapType}` });
+    const actualWeight = Number(incoming.actualWeight);
+    if (!Number.isFinite(actualWeight) || actualWeight < 0) {
+      return res.status(400).json({ message: `Invalid actual weight for ${item.scrapType}` });
+    }
+    item.actualWeight = actualWeight;
+    item.amount = actualWeight * Number(item.rate || 0);
     finalAmount += item.amount;
-    return item;
-  });
+  }
   pickup.finalAmount = finalAmount;
   pickup.status = "PAYMENT_PENDING";
   await pickup.save();
+  await Notification.create({
+    userId: pickup.customerId,
+    type: "PAYMENT_PENDING",
+    title: "Final amount ready",
+    message: `Pickup ${pickup._id} is weighed. Final amount is ₹${finalAmount}.`,
+    data: { pickupId: pickup._id, finalAmount }
+  });
   res.json({ pickup });
 });
 
