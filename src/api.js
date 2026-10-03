@@ -1,14 +1,17 @@
-function resolveApiBase() {
-  // In Codespaces the Vite dev server already proxies /api to the backend.
-  // Keeping API calls same-origin avoids public-port/CORS problems.
+function resolveApiOrigin() {
   const configured = import.meta.env.VITE_API_URL;
   if (configured) return configured.replace(/\/$/, "");
+
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".app.github.dev")) {
+    return `https://${window.location.hostname.replace(/-5173(?=\.)/, "-4000")}/api`;
+  }
+
   return "/api";
 }
 
-const API_BASE = resolveApiBase();
+export const API_BASE = resolveApiOrigin();
 
-async function request(path, options = {}) {
+export async function request(path, options = {}) {
   const token = localStorage.getItem("scrap_mama_token");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -28,10 +31,10 @@ async function request(path, options = {}) {
     return data;
   } catch (error) {
     if (error.name === "AbortError") {
-      throw new Error("Backend request timed out. Check that the API server is running.");
+      throw new Error("Backend request timed out. Make sure port 4000/API is running.");
     }
     if (error instanceof TypeError && /fetch/i.test(error.message)) {
-      throw new Error("Unable to reach the API. Refresh the page and make sure the backend is running.");
+      throw new Error("Cannot reach the API. Start the backend on port 4000 and refresh.");
     }
     throw error;
   } finally {
