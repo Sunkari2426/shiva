@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
 import helmet from "helmet";
+import mongoose from "mongoose";
 import { config } from "./config.js";
 import { connectDatabase } from "./db.js";
 import authRoutes from "./routes/auth.js";
@@ -96,15 +97,12 @@ app.use((err, _req, res, _next) => {
 });
 
 function requireMongooseState() {
-  // Mongoose readyState: 0 disconnected, 1 connected, 2 connecting, 3 disconnecting.
-  return globalThis.__scrapMamaMongoReadyState ?? 0;
+  return mongoose.connection.readyState;
 }
 
 connectDatabase().then(() => {
-  globalThis.__scrapMamaMongoReadyState = 1;
   server.listen(config.port, () => console.log(`Scrap Mama API listening on http://localhost:${config.port}`));
 }).catch(err => {
-  globalThis.__scrapMamaMongoReadyState = 0;
   console.error("Startup failed", err);
   process.exit(1);
 });
